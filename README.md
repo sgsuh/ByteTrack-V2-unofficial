@@ -91,6 +91,35 @@ docker/run.sh python tools/track_nuscenes.py --dets outputs/centerpoint/mini_in_
 
 Using detected velocities consistently cuts ID switches compared with the Kalman-only model (30 → 11 IDS), matching the trend of Table 7. The remaining ±0.01 AMOTA differences are within the noise of 2–4 scenes, so the gains of Eq. 10 and BYTE reported on the full val set (+0.2 to +0.7 AMOTA) cannot be confirmed at this scale. The Kalman filter noise parameters are untuned defaults.
 
+### PETRv2 (camera) on nuScenes mini
+
+The paper's camera setting uses PETRv2 (VoVNet, 1600×640), which is not public. The public PETRv2-VoVNet-800×320 checkpoint (NDS 50.3 on full val) is used instead. It runs in a separate detector image that follows PETR's stack (CUDA 11.1, torch 1.9, mmcv-full 1.4.0, mmdet3d 0.17.1):
+
+```bash
+docker/petr/build.sh
+SPLITS="val train" tools/detectors/petrv2_infer.sh     # -> outputs/petrv2/mini_{val,train}_detections.json
+docker/run.sh python tools/filter_nusc_results.py --split mini_in_val \
+    --src outputs/petrv2/mini_val_detections.json outputs/petrv2/mini_train_detections.json \
+    --out outputs/petrv2/mini_in_val.json
+docker/run.sh python tools/track_nuscenes.py --dets outputs/petrv2/mini_in_val.json \
+    --split mini_in_val --modality camera --output outputs/nusc_petr_mini_in_val/full
+```
+
+PETRv2-800×320 on mini_val scores mAP 38.9 / NDS 42.4 / mAVE 0.571.
+
+| Motion / association (Table 7 / 8 rows) | mini_val AMOTA | IDS | mini_in_val AMOTA | IDS |
+|---|---|---|---|---|
+| Kalman | 0.549 | 100 | 0.563 | 120 |
+| Detected velocity | 0.570 | 57 | 0.583 | 74 |
+| Integrated | 0.566 | 57 | 0.571 | 79 |
+| Integrated + score update (Eq. 10, α = 100) | 0.567 | 41 | 0.572 | 61 |
+| Integrated + update + BYTE (full) | **0.580** | 73 | **0.586** | 89 |
+
+With noisier camera detections, the trends of Table 7 / 8 are clearer:
+- Detected velocities cut ID switches by about 40% compared with the Kalman-only model.
+- The score-adaptive update reduces ID switches further.
+- BYTE raises recall and gives the best AMOTA on both splits.
+
 A sanity check with noisy ground-truth "detections" (no detector needed):
 
 ```bash
@@ -115,4 +144,5 @@ The paper leaves a few details open; this implementation makes the following cho
 
 - [ByteTrack](https://github.com/FoundationVision/ByteTrack) (MIT, © 2021 Yifu Zhang): tracker logic, evaluation protocol and the vendored detector code.
 - [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) (Apache-2.0, © Megvii Inc.): files under `bytetrack_v2/detectors/yolox/` keep their original headers.
+- [PETR](https://github.com/megvii-research/PETR) (Apache-2.0) and [mmdetection3d](https://github.com/open-mmlab/mmdetection3d) for PETRv2 inference (not vendored; cloned into the detector image).
 - [nuscenes-devkit](https://github.com/nutonomy/nuscenes-devkit) and [TrackEval](https://github.com/JonathonLuiten/TrackEval) for evaluation.
