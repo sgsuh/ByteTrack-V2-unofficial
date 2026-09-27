@@ -15,8 +15,9 @@ from tqdm import tqdm
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bytetrack_v2.core.basetrack import BaseTrack  # noqa: E402
-from bytetrack_v2.datasets.nuscenes import (GIOU_THRESHOLDS, TRACKING_CLASSES,  # noqa: E402
-                                            load_detections, scene_samples, track_to_nusc)
+from bytetrack_v2.datasets.nuscenes import (CUSTOM_SPLITS, GIOU_THRESHOLDS,  # noqa: E402
+                                            TRACKING_CLASSES, load_detections, patch_eval_split,
+                                            resolve_split, scene_samples, track_to_nusc)
 from bytetrack_v2.tracker3d.byte_tracker import MOTION_MODES, MultiClassTracker3D  # noqa: E402
 
 PRESETS = {
@@ -31,7 +32,8 @@ def make_parser():
     p.add_argument("--dets", required=True, help="nuScenes detection results json")
     p.add_argument("--dataroot", default="datasets/nuscenes")
     p.add_argument("--version", default="v1.0-mini")
-    p.add_argument("--split", default="mini_val")
+    p.add_argument("--split", default="mini_val",
+                   help=f"official split or one of {sorted(CUSTOM_SPLITS)}")
     p.add_argument("--output", default="outputs/nusc")
     p.add_argument("--modality", default="lidar", choices=list(PRESETS))
     p.add_argument("--track-thresh", type=float, default=None, help="tau (overrides preset)")
@@ -64,10 +66,7 @@ def build_tracker(args):
     )
 
 
-def run(args, nusc):
-    from nuscenes.utils.splits import create_splits_scenes
-
-    scene_names = create_splits_scenes()[args.split]
+def run(args, nusc, scene_names):
     scenes = list(scene_samples(nusc, scene_names))
     tokens = {tok for _, samples in scenes for tok, _ in samples}
     detections = load_detections(args.dets, sample_tokens=tokens)
@@ -96,7 +95,8 @@ def main():
     from nuscenes import NuScenes
 
     nusc = NuScenes(version=args.version, dataroot=args.dataroot, verbose=False)
-    results = run(args, nusc)
+    eval_set, scene_names = resolve_split(args.split)
+    results = run(args, nusc, scene_names)
     result_path = os.path.join(args.output, "tracking_results.json")
     meta = {"use_camera": args.modality == "camera", "use_lidar": args.modality == "lidar",
             "use_radar": False, "use_map": False, "use_external": False}
@@ -108,7 +108,9 @@ def main():
         from nuscenes.eval.common.config import config_factory
         from nuscenes.eval.tracking.evaluate import TrackingEval
 
-        evaluator = TrackingEval(config_factory("tracking_nips_2019"), result_path, args.split,
+        if args.split in CUSTOM_SPLITS:
+            patch_eval_split(eval_set, scene_names)
+        evaluator = TrackingEval(config_factory("tracking_nips_2019"), result_path, eval_set,
                                  os.path.join(args.output, "eval"), args.version, args.dataroot,
                                  verbose=False)
         metrics = evaluator.main()

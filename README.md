@@ -67,6 +67,30 @@ Ablations of Table 7 / 8: `--motion {kalman,velocity,integrated}`, `--no-score-u
 
 Defaults follow Sec. 5.1: τ = 0.2, class-wise GIoU thresholds (bicycle −0.7, bus −0.2, car −0.1, motorcycle −0.5, pedestrian −0.7, trailer −0.4, truck −0.1), lost tracks kept for 30 frames, α = 10 (LiDAR) / 100 (camera).
 
+### CenterPoint (LiDAR) on nuScenes mini
+
+Official CenterPoint val predictions (`infos_val_10sweeps_withvelo_filter_True.json` from the [CenterPoint model zoo](https://github.com/tianweiy/CenterPoint/tree/master/configs/nusc)) filtered to the mini scenes:
+
+```bash
+docker/run.sh python tools/filter_nusc_results.py \
+    --src datasets/centerpoint_result/infos_val_10sweeps_withvelo_filter_True.json \
+    --out outputs/centerpoint/mini_in_val.json --split mini_in_val
+docker/run.sh python tools/track_nuscenes.py --dets outputs/centerpoint/mini_in_val.json \
+    --split mini_in_val --output outputs/nusc_cp_inval/full
+```
+
+`mini_in_val` contains the 4 `v1.0-mini` scenes that belong to the official val split (scene-0103, -0553, -0796, -0916), so they are unseen by the detector. `mini_val` is the official 2-scene subset.
+
+| Motion / association (Table 7 / 8 rows) | mini_val AMOTA | IDS | mini_in_val AMOTA | IDS |
+|---|---|---|---|---|
+| Kalman | 0.771 | 18 | 0.698 | 30 |
+| Detected velocity | 0.782 | 10 | 0.708 | 11 |
+| Integrated | 0.776 | 12 | 0.704 | 13 |
+| Integrated + score update (Eq. 10) | 0.780 | 16 | 0.700 | 17 |
+| Integrated + update + BYTE (full) | 0.792 | 13 | 0.697 | 16 |
+
+Using detected velocities consistently cuts ID switches compared with the Kalman-only model (30 → 11 IDS), matching the trend of Table 7. The remaining ±0.01 AMOTA differences are within the noise of 2–4 scenes, so the gains of Eq. 10 and BYTE reported on the full val set (+0.2 to +0.7 AMOTA) cannot be confirmed at this scale. The Kalman filter noise parameters are untuned defaults.
+
 A sanity check with noisy ground-truth "detections" (no detector needed):
 
 ```bash
@@ -74,7 +98,7 @@ docker/run.sh python tools/make_pseudo_detections.py --out outputs/pseudo_dets/m
 docker/run.sh python tools/track_nuscenes.py --dets outputs/pseudo_dets/mini_val.json --output outputs/nusc_pseudo
 ```
 
-> Only `v1.0-mini` is used here, so `mini_val` has 2 scenes; numbers are not comparable with the paper's full validation set.
+> Only `v1.0-mini` is used here, so the numbers are not comparable with the paper's full validation set (CenterPoint: 72.4 AMOTA).
 
 ## Interpretation choices
 

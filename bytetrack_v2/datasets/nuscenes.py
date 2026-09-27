@@ -94,3 +94,41 @@ def track_to_nusc(track, sample_token, class_name):
         "tracking_name": class_name,
         "tracking_score": float(track.score),
     }
+
+
+# Extra splits: name -> (official eval set passed to the devkit, scene selector).
+# "mini_in_val": the 4 v1.0-mini scenes that belong to the official val split,
+# i.e. scenes unseen by detectors trained on the official train split.
+CUSTOM_SPLITS = {
+    "mini_in_val": ("mini_val", lambda s: [n for n in s["mini_train"] + s["mini_val"] if n in s["val"]]),
+}
+
+
+def resolve_split(split):
+    """Return (devkit eval set, scene names) for an official or custom split."""
+    from nuscenes.utils.splits import create_splits_scenes
+
+    splits = create_splits_scenes()
+    if split in CUSTOM_SPLITS:
+        eval_set, select = CUSTOM_SPLITS[split]
+        return eval_set, select(splits)
+    return split, splits[split]
+
+
+def patch_eval_split(eval_set, scene_names):
+    """Make the nuScenes devkit evaluate `eval_set` on `scene_names`.
+
+    The devkit validates split names against a fixed list, so custom splits
+    are evaluated under an official name whose scene list is replaced.
+    """
+    import nuscenes.eval.common.loaders as common_loaders
+    import nuscenes.eval.tracking.loaders as tracking_loaders
+    from nuscenes.utils.splits import create_splits_scenes
+
+    def patched():
+        splits = create_splits_scenes()
+        splits[eval_set] = list(scene_names)
+        return splits
+
+    common_loaders.create_splits_scenes = patched
+    tracking_loaders.create_splits_scenes = patched
