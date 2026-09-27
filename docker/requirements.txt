@@ -1,0 +1,26 @@
+# numpy<1.24 / pandas<2 / motmetrics==1.1.3 are pinned for nuscenes-devkit tracking eval
+numpy==1.23.5
+pandas==1.5.3
+scipy==1.11.4
+motmetrics==1.1.3
+# nuscenes-devkit runtime deps (the devkit itself is installed with --no-deps,
+# because it pins shapely<2 while giou3d relies on shapely 2 vectorized ops)
+pyquaternion>=0.9.5
+scikit-learn
+descartes
+fire
+cachetools
+Pillow
+lap==0.5.12
+shapely==2.0.6
+opencv-python-headless==4.8.1.78
+loguru
+tabulate
+thop
+pyyaml
+tqdm
+gdown
+pycocotools
+matplotlib<3.9
+pytest
+git+https://github.com/JonathonLuiten/TrackEval.git

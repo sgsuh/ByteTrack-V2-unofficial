@@ -1,0 +1,25 @@
+# Datasets (downloaded locally, never committed)
+/datasets/
+
+# Model weights, detection results and experiment outputs
+/pretrained/
+/outputs/
+*.pth
+*.pth.tar
+*.onnx
+*.engine
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
