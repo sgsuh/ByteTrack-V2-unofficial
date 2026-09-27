@@ -19,6 +19,9 @@ dist/
 .pytest_cache/
 .ipynb_checkpoints/
 
+# Claude Code local files (session notes, settings)
+/.claude/
+
 # Editors / OS
 .vscode/
 .idea/
